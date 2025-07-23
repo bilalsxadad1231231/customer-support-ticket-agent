@@ -1,0 +1,11 @@
+langgraph 
+langchain 
+langchain-groq 
+langchain-community
+faiss-cpu 
+python-dotenv 
+pydantic 
+pandas 
+numpy> 
+uvicorn 
+fastapi 

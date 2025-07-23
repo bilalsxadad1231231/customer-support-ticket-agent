@@ -1,0 +1,9 @@
+2025-07-23 10:48:45,452 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2025-07-23 10:48:50,077 - huggingface_hub.file_download - WARNING - Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+2025-07-23 10:51:30,448 - workflow.graph - INFO - Support agent graph compiled successfully
+2025-07-23 11:09:35,189 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2025-07-23 11:09:41,890 - workflow.graph - INFO - Support agent graph compiled successfully
+2025-07-23 11:09:53,657 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2025-07-23 11:09:59,846 - workflow.graph - INFO - Support agent graph compiled successfully
+2025-07-23 11:10:04,637 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2025-07-23 11:10:09,905 - workflow.graph - INFO - Support agent graph compiled successfully
