@@ -103,12 +103,32 @@ class LLMService:
                 context=context
             )
             
-            messages = [HumanMessage(content=prompt)]
+            messages = [
+                SystemMessage(content="You are a quality assurance reviewer. Always respond with valid JSON."),
+                HumanMessage(content=prompt)
+            ]
             response = await self.llm.ainvoke(messages)
             
-            # Parse JSON response
-            result = json.loads(response.content.strip())
-            return result
+            # Clean up response content
+            content = response.content.strip()
+            # Try to find JSON in the response if it's wrapped in other text
+            if not content.startswith('{'):
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    content = json_match.group(0)
+            
+            try:
+                # Parse JSON response
+                result = json.loads(content)
+                # Validate required fields
+                required_fields = {"approved", "score", "feedback", "issues"}
+                if not all(field in result for field in required_fields):
+                    raise ValueError("Missing required fields in response")
+                return result
+            except json.JSONDecodeError as je:
+                logger.error(f"Failed to parse review response as JSON: {je}\nResponse: {content}")
+                raise
             
         except Exception as e:
             logger.error(f"Review error: {e}")
@@ -116,6 +136,6 @@ class LLMService:
             return {
                 "approved": True,
                 "score": 0.7,
-                "feedback": "System error during review, auto-approved",
+                "feedback": f"System error during review ({str(e)}), auto-approved",
                 "issues": []
             }

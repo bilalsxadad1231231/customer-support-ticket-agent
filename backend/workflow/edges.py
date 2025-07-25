@@ -1,6 +1,6 @@
 # workflow/edges.py
 import logging
-from typing import Literal
+from typing import Literal, Dict, Any
 from workflow.state import SupportAgentState
 from config.settings import settings
 
@@ -14,33 +14,33 @@ class SupportEdges:
         """Determine if we should retry, escalate, or output final response"""
         
         # If no review result, something went wrong - escalate
-        if not state.review_result:
+        if not state["review_result"]:
             logger.warning("No review result found, escalating")
             return "escalate"
         
         # If approved, output final response
-        if state.review_result.approved:
+        if state["review_result"].approved:
             logger.info("Draft approved, proceeding to final output")
             return "output"
         
         # If max retries reached, escalate
-        if state.retry_count >= settings.MAX_RETRIES:
+        if state["retry_count"] >= settings.MAX_RETRIES:
             logger.info(f"Max retries ({settings.MAX_RETRIES}) reached, escalating")
             return "escalate"
         
         # Otherwise, retry
-        logger.info(f"Draft rejected, retrying (attempt {state.retry_count + 1}/{settings.MAX_RETRIES})")
+        logger.info(f"Draft rejected, retrying (attempt {state['retry_count'] + 1}/{settings.MAX_RETRIES})")
         return "retry"
     
     @staticmethod
     def route_by_category(state: SupportAgentState) -> Literal["billing", "technical", "security", "general"]:
         """Route to appropriate RAG retrieval based on classification"""
         
-        if not state.classification:
+        if not state["classification"]:
             logger.warning("No classification found, routing to general")
             return "general"
         
-        category = state.classification.category.lower()
+        category = state["classification"].category.lower()
         
         if category in settings.CATEGORIES:
             logger.info(f"Routing to {category} RAG retrieval")
@@ -52,15 +52,15 @@ class SupportEdges:
     @staticmethod
     def is_processing_complete(state: SupportAgentState) -> bool:
         """Check if processing is complete (either resolved or escalated)"""
-        return state.final_response is not None or state.escalated
+        return state["final_response"] is not None or state["escalated"]
     
     @staticmethod
     def needs_context_refinement(state: SupportAgentState) -> bool:
         """Check if context refinement is needed for retry"""
         return (
-            state.review_result is not None and 
-            not state.review_result.approved and 
-            state.retry_count < settings.MAX_RETRIES
+            state["review_result"] is not None and 
+            not state["review_result"].approved and 
+            state["retry_count"] < settings.MAX_RETRIES
         )
     
     @staticmethod
@@ -80,7 +80,7 @@ class SupportEdges:
         
         if to_node in required_state:
             for required_field in required_state[to_node]:
-                if not hasattr(state, required_field) or getattr(state, required_field) is None:
+                if required_field not in state or state[required_field] is None:
                     logger.error(f"Missing required field {required_field} for transition to {to_node}")
                     return False
         
