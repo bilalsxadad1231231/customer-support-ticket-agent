@@ -253,7 +253,7 @@ job application test project/
 │   │   └── utils/             # Frontend utilities
 │   ├── package.json           # Node.js dependencies
 │   └── tailwind.config.js    # Tailwind CSS config
-└── raw_code/                  # Development scripts
+
 ```
 
 ## 🛠️ Technology Stack
@@ -296,8 +296,8 @@ job application test project/
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd "job application test project"
+   git clone https://github.com/bilalsxadad1231231/customer-support-ticket-agent.git
+   cd customer-support-ticket-agent
    ```
 
 2. **Navigate to backend directory**
@@ -320,19 +320,7 @@ job application test project/
    ```
 
 5. **Set up environment variables**
-   Create a `.env` file in the backend directory:
-   ```env
-   # LLM Provider API Key
-   GROQ_API_KEY=your_groq_api_key_here
-   
-   # LangChain Configuration
-   LANGCHAIN_API_KEY=your_langchain_api_key_here
-   LANGCHAIN_PROJECT=your_project_name
-   LANGCHAIN_TRACING_V2=true
-   LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
-   ```
-   
-   **Note**: Replace `your_groq_api_key_here`, `your_langchain_api_key_here`, and `your_project_name` with your actual API keys and project details.
+   Create a `.env` file in the backend directory (see Environment Variables section below for details).
 
 6. **Run the backend server**
    ```bash
@@ -367,28 +355,7 @@ job application test project/
 
    The frontend will be available at `http://localhost:3000`
 
-### Docker Setup (Alternative)
 
-1. **Build LangGraph Docker image**
-   ```bash
-   # From the backend directory
-   cd backend
-   
-   # Build using LangGraph CLI
-   langgraph build -t my-agent-image
-   
-   # Or build with specific configuration
-   langgraph build --config langgraph.json -t my-agent-image
-   ```
-
-2. **Run LangGraph container**
-   ```bash
-   # Run the built image
-   langgraph up --image my-agent-image --wait --port 2024
-   
-   # Or run with Docker Compose
-   docker-compose up --build
-   ```
 
 ## 📖 API Endpoints
 
@@ -431,7 +398,7 @@ The project is configured with LangSmith for comprehensive workflow monitoring:
 
 ### Frontend Configuration
 - **LangGraph SDK**: Configured in `src/services/agentService.js` for direct workflow interaction
-- **API Base URL**: Set to LangGraph server at `http://localhost:8123`
+- **API Base URL**: Set to LangGraph server at `http://localhost:2024`
 - **Tailwind CSS**: Custom theme in `tailwind.config.js`
 
 ## 📊 Usage Examples
@@ -455,7 +422,6 @@ The project is configured with LangSmith for comprehensive workflow monitoring:
 - **Adding new workflows**: Extend `src/workflow/graph.py`
 - **Modifying workflow nodes**: Update `src/workflow/nodes.py`
 - **Adding prompts**: Create new files in `src/prompts/`
-- **Testing**: Use the provided test scripts in `raw_code/`
 - **LangGraph CLI**: Use `langgraph dev` for development server
 - **LangGraph Studio**: Automatically opens in browser when server starts
 - **LangGraph Build**: Use `langgraph build -t image-name` for Docker image creation
@@ -464,7 +430,7 @@ The project is configured with LangSmith for comprehensive workflow monitoring:
 ### LangSmith Development Tools
 - **Trace Analysis**: Use LangSmith dashboard to analyze workflow performance
 - **Debug Workflows**: Step through execution traces to identify issues
-- **A/B Testing**: Compare different workflow configurations
+- **Performance Comparison**: Compare different workflow configurations
 - **Custom Metrics**: Track business-specific metrics like resolution time
 - **Collaboration**: Share traces with team members for debugging
 
@@ -480,19 +446,7 @@ The LangGraph workflow can be extended by:
 2. Defining edges in `src/workflow/edges.py`
 3. Updating the graph structure in `src/workflow/graph.py`
 
-## 🧪 Testing
 
-### Backend Testing
-```bash
-cd backend
-python -m pytest tests/
-```
-
-### Frontend Testing
-```bash
-cd frontend
-npm test
-```
 
 ## 🐳 Docker Deployment
 
@@ -570,7 +524,7 @@ REACT_APP_LANGGRAPH_URL=http://localhost:2024
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Add documentation if applicable
 5. Submit a pull request
 
 ## 📄 License
