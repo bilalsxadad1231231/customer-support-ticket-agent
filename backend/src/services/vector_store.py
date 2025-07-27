@@ -2,6 +2,7 @@
 import os
 import pickle
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 
 from langchain.retrievers import BM25Retriever, EnsembleRetriever
@@ -21,7 +22,7 @@ class VectorStoreService:
     """
     def __init__(self):
         # Ensure the directory for storing index files exists
-        os.makedirs(settings.INDEX_DIR, exist_ok=True)
+        self._ensure_index_dir()
         
         self.embeddings = HuggingFaceEmbeddings(
             model_name=settings.EMBEDDING_MODEL,
@@ -34,14 +35,26 @@ class VectorStoreService:
         self.ensemble_retrievers: Dict[str, EnsembleRetriever] = {}
         self._load_retrievers()
 
-    def _load_retrievers(self):
-        """Load pre-built retriever objects from disk for each category."""
+    async def _ensure_index_dir(self):
+        """Ensure the index directory exists asynchronously"""
+        await asyncio.to_thread(os.makedirs, settings.INDEX_DIR, exist_ok=True)
+
+    async def _load_retrievers(self):
+        """Load pre-built retriever objects from disk for each category asynchronously."""
         for category in settings.CATEGORIES:
             file_path = os.path.join(settings.INDEX_DIR, f"{category}_retriever.pkl")
-            if os.path.exists(file_path):
+            
+            # Check if file exists asynchronously
+            file_exists = await asyncio.to_thread(os.path.exists, file_path)
+            
+            if file_exists:
                 try:
-                    with open(file_path, "rb") as f:
-                        self.ensemble_retrievers[category] = pickle.load(f,)
+                    # Load retriever asynchronously
+                    def load_retriever():
+                        with open(file_path, "rb") as f:
+                            return pickle.load(f)
+                    
+                    self.ensemble_retrievers[category] = await asyncio.to_thread(load_retriever)
                     logger.info(f"Successfully loaded retriever for category '{category}'.")
                 except Exception as e:
                     logger.error(f"Failed to load retriever for '{category}': {e}")
@@ -81,10 +94,14 @@ class VectorStoreService:
             weights=[0.5, 0.5] # 50% keyword-based, 50% vector-based
         )
 
-        # 5. Save the created retriever to disk for future use
+        # 5. Save the created retriever to disk for future use asynchronously
         file_path = os.path.join(settings.INDEX_DIR, f"{category}_retriever.pkl")
-        with open(file_path, "wb") as f:
-            pickle.dump(self.ensemble_retrievers[category], f)
+        
+        def save_retriever():
+            with open(file_path, "wb") as f:
+                pickle.dump(self.ensemble_retrievers[category], f)
+        
+        await asyncio.to_thread(save_retriever)
             
         logger.info(f"Successfully created and saved hybrid retriever for category '{category}'.")
 
