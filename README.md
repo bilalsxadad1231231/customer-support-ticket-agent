@@ -503,10 +503,6 @@ LANGCHAIN_API_KEY=your_langchain_api_key_here
 LANGCHAIN_PROJECT=your_project_name
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
-
-# Application Settings
-LOG_LEVEL=INFO
-MAX_RETRIES=2
 ```
 
 **Required API Keys:**
