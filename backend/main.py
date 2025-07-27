@@ -1,209 +1,153 @@
-# main.py
+# mypy: disable - error - code = "no-untyped-def,misc"
 import asyncio
 import logging
-import uuid
-from typing import Dict, Any
-from fastapi import FastAPI, HTTPException
+import os
+import csv
+import json
+from typing import Dict, List
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from workflow.graph import SupportAgentGraph
-from utils.validators import TicketValidator
-from config.settings import settings
+from src.services.vector_store import VectorStoreService
+from langchain.document_loaders import PyPDFLoader
+import tempfile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app
-app = FastAPI(
-    title="Support Ticket Resolution Agent",
-    description="AI-powered support agent using LangGraph",
-    version="1.0.0"
-)
+# Define the FastAPI app
+app = FastAPI()
+ 
+# Initialize vector store service
+vector_store_service = VectorStoreService()
 
-# Initialize graph
-support_graph = None
-
-class TicketRequest(BaseModel):
-    subject: str
-    description: str
-    ticket_id: str = None
-
-class TicketResponse(BaseModel):
-    ticket_id: str
-    subject: str
-    description: str
-    category: str
-    final_response: str
-    escalated: bool
-    retry_count: int
-    processing_time: float
-    drafts_generated: int
-    reviews_conducted: int
-    escalation_reason: str = None
+class UploadResponse(BaseModel):
+    success: bool
+    files_processed: List[str]
     error: str = None
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the support agent graph on startup"""
-    global support_graph
-    
-    try:
-        logger.info("Initializing support agent graph...")
-        support_graph = SupportAgentGraph()
-        logger.info("Support agent graph initialized successfully")
-        
-        # Initialize vector stores
-        await support_graph.nodes.vector_service.initialize_vector_stores()
-        logger.info("Vector stores initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Failed to initialize support agent: {e}")
-        raise
+class EscalationLogResponse(BaseModel):
+    success: bool
+    data: List[Dict[str, str]]
+    total_records: int
+ 
 
-@app.post("/process_ticket", response_model=TicketResponse)
-async def process_ticket(request: TicketRequest) -> TicketResponse:
-    """Process a support ticket"""
-    
+@app.post("/upload", response_model=UploadResponse)
+async def upload_documents(
+    files: List[UploadFile] = File(...),
+    category: str = Form(...)
+) -> UploadResponse:
+    """Upload documents to the vector store with category"""
     try:
-        # Validate input
-        validation = TicketValidator.validate_ticket_input(
-            request.subject, 
-            request.description
-        )
-        
-        if not validation["valid"]:
+        if not vector_store_service:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid input: {', '.join(validation['errors'])}"
+                status_code=500,
+                detail="Vector store service not initialized"
+            )
+
+        processed_files = []
+        
+        for file in files:
+            # Check if file is PDF
+            if not file.filename.lower().endswith('.pdf'):
+                continue  # Skip non-PDF files
+                
+            # Create temporary file
+            temp_file = None
+            try:
+                # Read file content
+                contents = await file.read()
+                
+                # Create temporary file
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                temp_file.write(contents)
+                temp_file.flush()
+                temp_file.close()  # Close the file handle
+                
+                # Load PDF using PyPDFLoader (same as add_doc.py)
+                loader = PyPDFLoader(temp_file.name)
+                documents = loader.load()
+                
+                # Add to vector store with specified category
+                await vector_store_service.add_documents(documents=documents, category=category)
+                processed_files.append(file.filename)
+                
+                print(f"Successfully processed '{file.filename}' -> Category: '{category}'")
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file.filename}: {str(e)}")
+                raise e
+            finally:
+                # Cleanup temp file with retry logic
+                if temp_file and os.path.exists(temp_file.name):
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError as e:
+                        logger.warning(f"Could not delete temp file {temp_file.name}: {e}")
+                        # On Windows, sometimes files need time to be released
+                        import time
+                        time.sleep(0.1)
+                        try:
+                            os.unlink(temp_file.name)
+                        except OSError:
+                            pass  # Give up if still can't delete
+        
+        if not processed_files:
+            return UploadResponse(
+                success=False,
+                files_processed=[],
+                error="No PDF files were processed"
             )
         
-        # Generate ticket ID if not provided
-        ticket_id = request.ticket_id or str(uuid.uuid4())
-        
-        # Process ticket
-        result = await support_graph.process_ticket(
-            subject=validation["cleaned_subject"],
-            description=validation["cleaned_description"],
-            ticket_id=ticket_id
+        return UploadResponse(
+            success=True,
+            files_processed=processed_files
         )
         
-        return TicketResponse(**result)
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error processing ticket: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in upload_documents: {str(e)}")
+        return UploadResponse(
+            success=False,
+            files_processed=[],
+            error=str(e)
+        )
 
-@app.get("/ticket/{ticket_id}/history")
-async def get_ticket_history(ticket_id: str) -> Dict[str, Any]:
-    """Get processing history for a ticket"""
-    
+@app.get("/escalation-log", response_model=EscalationLogResponse)
+async def get_escalation_log() -> EscalationLogResponse:
+    """Get escalation log data from CSV file"""
     try:
-        history = await support_graph.get_processing_history(ticket_id)
-        return history
+        csv_file_path = "data/escalation_log.csv"
+        
+        if not os.path.exists(csv_file_path):
+            raise HTTPException(
+                status_code=404,
+                detail="Escalation log file not found"
+            )
+        
+        data = []
+        with open(csv_file_path, 'r', encoding='utf-8') as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                data.append(row)
+        
+        return EscalationLogResponse(
+            success=True,
+            data=data,
+            total_records=len(data)
+        )
         
     except Exception as e:
-        logger.error(f"Error getting ticket history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/graph/structure")
-async def get_graph_structure() -> Dict[str, str]:
-    """Get graph structure visualization"""
-    
-    return {
-        "structure": support_graph.get_graph_visualization()
-    }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading escalation log: {str(e)}"
+        )
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Health check endpoint"""
-    
     return {
         "status": "healthy",
         "version": "1.0.0",
-        "graph_initialized": support_graph is not None
+        "vector_store_initialized": str(vector_store_service is not None)
     }
-
-# CLI interface for development
-async def cli_interface():
-    """Command line interface for testing"""
-    
-    print("Support Ticket Resolution Agent - CLI Interface")
-    print("=" * 50)
-    
-    # Initialize graph
-    global support_graph
-    support_graph = SupportAgentGraph()
-    await support_graph.nodes.vector_service.initialize_vector_stores()
-    
-    print("Graph initialized successfully!")
-    print("Enter 'quit' to exit\n")
-    
-    while True:
-        try:
-            print("\n" + "-" * 30)
-            subject = input("Enter ticket subject: ").strip()
-            
-            if subject.lower() == 'quit':
-                break
-            
-            if not subject:
-                print("Subject cannot be empty!")
-                continue
-            
-            description = input("Enter ticket description: ").strip()
-            
-            if not description:
-                print("Description cannot be empty!")
-                continue
-            
-            # Validate input
-            validation = TicketValidator.validate_ticket_input(subject, description)
-            
-            if not validation["valid"]:
-                print(f"Invalid input: {', '.join(validation['errors'])}")
-                continue
-            
-            print("\nProcessing ticket...")
-            
-            # Process ticket
-            result = await support_graph.process_ticket(
-                subject=validation["cleaned_subject"],
-                description=validation["cleaned_description"],
-                ticket_id=str(uuid.uuid4())
-            )
-            
-            # Display results
-            print("\n" + "=" * 50)
-            print("TICKET PROCESSING RESULTS")
-            print("=" * 50)
-            print(f"Category: {result['category']}")
-            print(f"Escalated: {result['escalated']}")
-            print(f"Retry Count: {result['retry_count']}")
-            print(f"Processing Time: {result['processing_time']:.2f}s")
-            print(f"Drafts Generated: {result['drafts_generated']}")
-            print(f"Reviews Conducted: {result['reviews_conducted']}")
-            
-            if result['escalated']:
-                print(f"Escalation Reason: {result['escalation_reason']}")
-            
-            print("\nFINAL RESPONSE:")
-            print("-" * 20)
-            print(result['final_response'])
-            print("=" * 50)
-            
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            break
-        except Exception as e:
-            print(f"Error: {e}")
-
-if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) > 1 and sys.argv[1] == "cli":
-        asyncio.run(cli_interface())
-    else:
-        import uvicorn
-        uvicorn.run(app, host="0.0.0.0", port=8000)
