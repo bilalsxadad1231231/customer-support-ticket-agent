@@ -59,15 +59,22 @@ async def upload_documents(
                 # Read file content
                 contents = await file.read()
                 
-                # Create temporary file
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-                temp_file.write(contents)
-                temp_file.flush()
-                temp_file.close()  # Close the file handle
+                # Create temporary file asynchronously
+                def create_temp_file():
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                    temp_file.write(contents)
+                    temp_file.flush()
+                    temp_file.close()  # Close the file handle
+                    return temp_file.name
                 
-                # Load PDF using PyPDFLoader (same as add_doc.py)
-                loader = PyPDFLoader(temp_file.name)
-                documents = loader.load()
+                temp_file_path = await asyncio.to_thread(create_temp_file)
+                
+                # Load PDF using PyPDFLoader asynchronously
+                def load_pdf():
+                    loader = PyPDFLoader(temp_file_path)
+                    return loader.load()
+                
+                documents = await asyncio.to_thread(load_pdf)
                 
                 # Add to vector store with specified category
                 await vector_store_service.add_documents(documents=documents, category=category)
@@ -79,17 +86,16 @@ async def upload_documents(
                 logger.error(f"Error processing file {file.filename}: {str(e)}")
                 raise e
             finally:
-                # Cleanup temp file with retry logic
-                if temp_file and os.path.exists(temp_file.name):
+                # Cleanup temp file with retry logic asynchronously
+                if temp_file_path and await asyncio.to_thread(os.path.exists, temp_file_path):
                     try:
-                        os.unlink(temp_file.name)
+                        await asyncio.to_thread(os.unlink, temp_file_path)
                     except OSError as e:
-                        logger.warning(f"Could not delete temp file {temp_file.name}: {e}")
+                        logger.warning(f"Could not delete temp file {temp_file_path}: {e}")
                         # On Windows, sometimes files need time to be released
-                        import time
-                        time.sleep(0.1)
+                        await asyncio.sleep(0.1)
                         try:
-                            os.unlink(temp_file.name)
+                            await asyncio.to_thread(os.unlink, temp_file_path)
                         except OSError:
                             pass  # Give up if still can't delete
         
