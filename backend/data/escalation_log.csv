@@ -1,8 +1,0 @@
-timestamp,ticket_id,subject,description,category,classification_confidence,num_drafts,num_reviews,final_review_score,escalation_reason,failed_drafts,reviewer_feedback
-2025-07-27T11:56:23.346645,TICKET-1753599259881-f7f0xccvo-xs7fz9i9t-4,AI-Powered Smart Home Automation System,I would like to know about smart home systems in our area,general,0.9,3,3,0.6,Maximum retry attempts exceeded without approval,"Hi there,
-
-Thank you for reaching out to us about smart home systems in your area. I'd be happy to h... | Hi there,
-
-Thank you for reaching out to us about smart home systems in your area. I'd be happy to h... | Hi there,
-
-Thank you for reaching out to us about smart home systems in your area. I'd be happy to h...","The response is incomplete and does not address the customer's concern about smart home systems in t... | The response is well-structured and professional, but it lacks relevance to the customer's query abo... | The response is well-structured and polite, but it lacks relevance to the customer's query about sma..."
