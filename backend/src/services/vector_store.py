@@ -33,7 +33,6 @@ class VectorStoreService:
             chunk_overlap=200
         )
         self.ensemble_retrievers: Dict[str, EnsembleRetriever] = {}
-        self._load_retrievers()
 
     async def _ensure_index_dir(self):
         """Ensure the index directory exists asynchronously"""
@@ -46,7 +45,7 @@ class VectorStoreService:
             
             # Check if file exists asynchronously
             file_exists = await asyncio.to_thread(os.path.exists, file_path)
-            
+            logger.info(f"file_exists: {file_exists}")
             if file_exists:
                 try:
                     # Load retriever asynchronously
@@ -109,6 +108,9 @@ class VectorStoreService:
         """
         Performs a hybrid search using the ensemble retriever for the given category.
         """
+        if self.ensemble_retrievers == {}:
+            await self._load_retrievers()
+
         if category not in self.ensemble_retrievers:
             return {
                 'documents': [f"No knowledge base found for category '{category}'. Please build the index first."],
